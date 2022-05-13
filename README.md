@@ -8,7 +8,7 @@ TLDR; Web hra hledani min v jazyku Elm.
 - [ ] Vizualizace hry (nejake UI, zobrazeni skore, zobrazeni konce/zacatku hry).
 - [ ] Implementovat ucita nasteveni, diky kterym lze nastavit obtiznost (pocet bomb, velikost hraciho pole).
 - [ ] Projit s Netlify, ktery udela deploy aplikace pri kazdem commitu.
-- [ ] Ukladat progress do local storage (optinal)
+- [ ] Ukladat progress and highscore do local storage
 
 ## Funkcni pozadavky:
 
