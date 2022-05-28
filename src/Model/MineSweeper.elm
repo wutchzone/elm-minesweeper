@@ -1,10 +1,35 @@
-module Model.MineSweeper exposing (MineSweeperModel, Tile, discoverTile, getTiles, getXSize, getYSize, newGame)
+module Model.MineSweeper exposing
+    ( GameStatus(..)
+    , MineSweeperModel
+    , Tile
+    , decodeMineSweeperModel
+    , discoverTile
+    , encodeMineSweeperModel
+    , getGameStatus
+    , getPoints
+    , getTiles
+    , getXSize
+    , getYSize
+    , linearDiscoverTile
+    , linearToggleFlagTile
+    , newGame
+    , toggleFlagTile
+    )
 
 import Array exposing (Array)
 import Debug
 import Html exposing (b)
+import Json.Decode as Decode exposing (Decoder, bool, decodeString, float, int, nullable, string)
+import Json.Decode.Pipeline exposing (hardcoded, optional, required)
+import Json.Encode as Encode
 import List.Extra exposing (getAt, removeAt)
 import Random exposing (Seed, int, step)
+
+
+type GameStatus
+    = GameRunning
+    | GameOver
+    | GameWon
 
 
 type alias MineSweeperModel =
@@ -13,6 +38,42 @@ type alias MineSweeperModel =
 
 type alias Tile =
     { discovered : Bool, bombsAround : Int, flagged : Bool, isBomb : Bool }
+
+
+encodeTile : Tile -> Encode.Value
+encodeTile tile =
+    Encode.object
+        [ ( "discovered", Encode.bool tile.discovered )
+        , ( "bombsAround", Encode.int tile.bombsAround )
+        , ( "flagged", Encode.bool tile.flagged )
+        , ( "isBomb", Encode.bool tile.isBomb )
+        ]
+
+
+decodeTile : Decoder Tile
+decodeTile =
+    Decode.succeed Tile
+        |> required "discovered" bool
+        |> required "bombsAround" Decode.int
+        |> required "flagged" bool
+        |> required "isBomb" bool
+
+
+encodeMineSweeperModel : MineSweeperModel -> Encode.Value
+encodeMineSweeperModel model =
+    Encode.object
+        [ ( "x", Encode.int model.x )
+        , ( "y", Encode.int model.y )
+        , ( "mines", Encode.array encodeTile model.mines )
+        ]
+
+
+decodeMineSweeperModel : Decoder MineSweeperModel
+decodeMineSweeperModel =
+    Decode.succeed MineSweeperModel
+        |> required "x" Decode.int
+        |> required "y" Decode.int
+        |> required "mines" (Decode.array decodeTile)
 
 
 makeTile : Bool -> Int -> Bool -> Bool -> Tile
@@ -104,6 +165,44 @@ getTiles model =
     model.mines
 
 
+isGameOver : MineSweeperModel -> Bool
+isGameOver model =
+    Array.foldl (||) False (Array.map (\item -> item.discovered && item.isBomb) model.mines)
+
+
+isGameWin : MineSweeperModel -> Bool
+isGameWin model =
+    Array.foldl (&&) True (Array.map (\item -> item.flagged && item.isBomb || item.discovered && not item.isBomb) model.mines)
+
+
+getGameStatus : MineSweeperModel -> GameStatus
+getGameStatus model =
+    if isGameOver model then
+        GameOver
+
+    else if isGameWin model then
+        GameWon
+
+    else
+        GameRunning
+
+
+getPoints : MineSweeperModel -> Int
+getPoints model =
+    Array.foldl (+)
+        0
+        (Array.map
+            (\item ->
+                if item.discovered && not item.isBomb then
+                    1
+
+                else
+                    0
+            )
+            model.mines
+        )
+
+
 {-| Discovers individual tile on given coordinates.
 Expects model and then returns modified model.
 -}
@@ -113,6 +212,14 @@ discoverTile prevModel x y =
         index =
             y * getXSize prevModel + x
     in
+    linearDiscoverTile prevModel index
+
+
+{-| Same as discoverTile but the coordinations are expected as 1D array instead of a 2D
+Coordinations
+-}
+linearDiscoverTile : MineSweeperModel -> Int -> MineSweeperModel
+linearDiscoverTile prevModel index =
     case Array.get index prevModel.mines of
         Just tile ->
             { prevModel | mines = Array.set index { tile | discovered = True } prevModel.mines }
@@ -123,9 +230,26 @@ discoverTile prevModel x y =
 
 {-| Flags individual tile if you think that there is a bomb on a given tile.
 -}
-flagTile : MineSweeperModel -> MineSweeperModel -> Int -> Int
-flagTile =
-    Debug.todo "implement"
+toggleFlagTile : MineSweeperModel -> Int -> Int -> MineSweeperModel
+toggleFlagTile prevModel x y =
+    let
+        index =
+            y * getXSize prevModel + x
+    in
+    linearToggleFlagTile prevModel index
+
+
+{-| Same as flagTile but the coordinations are expected as 1D array instead of a 2D
+Coordinations
+-}
+linearToggleFlagTile : MineSweeperModel -> Int -> MineSweeperModel
+linearToggleFlagTile prevModel index =
+    case Array.get index prevModel.mines of
+        Just tile ->
+            { prevModel | mines = Array.set index { tile | flagged = not tile.flagged } prevModel.mines }
+
+        Nothing ->
+            prevModel
 
 
 {-| Stolen from: <https://stackoverflow.com/questions/42207900/how-to-shuffle-a-list-in-elm>
@@ -143,7 +267,7 @@ shuffleListHelper seed source result =
     else
         let
             indexGenerator =
-                int 0 (List.length source - 1)
+                Random.int 0 (List.length source - 1)
 
             ( index, nextSeed ) =
                 step indexGenerator seed
