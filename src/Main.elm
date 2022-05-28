@@ -41,17 +41,8 @@ subscriptions model =
 
 type alias Model =
     { minesweeper : MineSweeperModel
+    , bombstodeploy : Int
     }
-
-
-type TodoList
-    = Loading
-    | Error String
-    | Success (List State)
-
-
-type alias State =
-    {}
 
 
 type Msg
@@ -59,6 +50,7 @@ type Msg
     | DiscoverTile Tile Int
     | FlagTile Tile Int
     | GameLoad String
+    | MineCountChange String
 
 
 port save : String -> Cmd msg
@@ -73,6 +65,7 @@ port doload : () -> Cmd msg
 init : () -> ( Model, Cmd Msg )
 init _ =
     ( { minesweeper = newGame 5 5 5 (Random.initialSeed 42)
+      , bombstodeploy = 5
       }
     , doload ()
     )
@@ -122,7 +115,8 @@ viewTile over index tile =
 view : Model -> Html Msg
 view model =
     Html.div []
-        [ Html.button [ Events.onClick <| GameRestart ] [ Html.text "Reset game" ]
+        [ Html.div [] [ Html.span [] [ Html.text "Number of bombs for next game: " ], Html.input [ Attributes.type_ "number", Attributes.value (String.fromInt model.bombstodeploy), Events.onInput MineCountChange ] [] ]
+        , Html.button [ Events.onClick <| GameRestart ] [ Html.text "Reset game" ]
         , Html.div [] [ Html.text ("Score: " ++ String.fromInt (getPoints model.minesweeper)) ]
         , Html.div []
             [ Html.text
@@ -169,7 +163,8 @@ update msg model =
         GameRestart ->
             let
                 newmodel =
-                    { minesweeper = newGame 5 5 5 (Random.initialSeed 42)
+                    { minesweeper = newGame 5 5 model.bombstodeploy (Random.initialSeed 42)
+                    , bombstodeploy = model.bombstodeploy
                     }
             in
             ( newmodel
@@ -200,3 +195,15 @@ update msg model =
                     { model | minesweeper = parsedmodel }
             , Cmd.none
             )
+
+        MineCountChange num ->
+            case String.toInt num of
+                Just parsednum ->
+                    if parsednum > 0 && parsednum < 10 then
+                        ( { model | bombstodeploy = parsednum }, Cmd.none )
+
+                    else
+                        ( model, Cmd.none )
+
+                Nothing ->
+                    ( model, Cmd.none )
