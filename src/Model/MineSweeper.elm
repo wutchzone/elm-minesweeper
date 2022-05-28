@@ -17,7 +17,6 @@ module Model.MineSweeper exposing
     )
 
 import Array exposing (Array)
-import Debug
 import Html exposing (b)
 import Json.Decode as Decode exposing (Decoder, bool, decodeString, float, int, nullable, string)
 import Json.Decode.Pipeline exposing (hardcoded, optional, required)
@@ -283,4 +282,4 @@ shuffleListHelper seed source result =
                 shuffleListHelper nextSeed sourceWithoutIndex (val :: result)
 
             Nothing ->
-                Debug.todo "generated an index outside list"
+                result
